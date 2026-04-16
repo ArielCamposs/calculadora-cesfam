@@ -1,0 +1,41 @@
+{
+  "name": "calculadora-farmacia",
+  "version": "1.0.0",
+  "description": "Calculadora de dosis de medicamentos",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:publish": "electron-builder --win --publish always"
+  },
+  "keywords": [],
+  "author": "Ariel",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^34.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.ariel.calculadorafarmacia",
+    "productName": "Calculadora de Dosis",
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ArielCamposs",
+        "repo": "calculadora-cesfam",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3"
+  }
+}

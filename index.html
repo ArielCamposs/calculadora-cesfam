@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Calculadora de Dosis</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- Barra de título personalizada -->
+  <div class="titlebar">
+    <div class="titlebar-drag"></div>
+    <div class="titlebar-controls">
+      <button class="tb-btn tb-minimize" id="btnMinimize" title="Minimizar">&#8722;</button>
+      <button class="tb-btn tb-close" id="btnClose" title="Cerrar">&#10005;</button>
+    </div>
+  </div>
+
+  <!-- Contenido principal -->
+  <div class="app-wrapper">
+
+    <!-- Encabezado -->
+    <div class="header">
+      <div class="header-icon" aria-hidden="true">
+        <svg class="header-icon-svg" viewBox="0 0 64 64" role="img">
+          <rect x="14" y="8" width="36" height="48" rx="8" fill="#f7fbff" stroke="#7da2ee" stroke-width="3"></rect>
+          <rect x="20" y="14" width="24" height="10" rx="3" fill="#dbe8ff"></rect>
+          <rect x="20" y="28" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
+          <rect x="29" y="28" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
+          <rect x="38" y="28" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
+          <rect x="20" y="37" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
+          <rect x="29" y="37" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
+          <rect x="38" y="37" width="7" height="16" rx="2" fill="#5f8ae8"></rect>
+          <rect x="20" y="46" width="16" height="7" rx="2" fill="#8cb0f3"></rect>
+        </svg>
+      </div>
+      <h1 class="header-title">Calculadora de dosis</h1>
+      <p class="header-subtitle">Calculadora de duración por caja</p>
+    </div>
+
+    <!-- Layout principal -->
+    <div class="main-layout">
+
+      <!-- Panel izquierdo: calculadora -->
+      <div class="card calc-card">
+
+        <!-- Comprimidos por caja -->
+        <div class="field-group">
+          <label class="field-label">
+            <span class="label-icon">💊</span>
+            COMPRIMIDOS POR CAJA
+          </label>
+          <div class="input-row">
+            <input
+              type="number"
+              id="totalPills"
+              class="input-field"
+              placeholder="0"
+              min="1"
+              max="99999"
+              step="1"
+            />
+            <span class="input-unit">comp.</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Dosis AM y PM -->
+        <div class="dose-row">
+          <div class="dose-group">
+            <label class="field-label">
+              <span class="label-icon">🌅</span>
+              DOSIS AM
+            </label>
+            <div class="input-row">
+              <input
+                type="number"
+                id="doseAM"
+                class="input-field"
+                placeholder="0"
+                min="0"
+                max="99"
+                step="1"
+              />
+              <span class="input-unit">comp.</span>
+            </div>
+            <span class="dose-hint">Mañana</span>
+          </div>
+
+          <div class="dose-plus">+</div>
+
+          <div class="dose-group">
+            <label class="field-label">
+              <span class="label-icon">🌙</span>
+              DOSIS PM
+            </label>
+            <div class="input-row">
+              <input
+                type="number"
+                id="dosePM"
+                class="input-field"
+                placeholder="0"
+                min="0"
+                max="99"
+                step="1"
+              />
+              <span class="input-unit">comp.</span>
+            </div>
+            <span class="dose-hint">Noche</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Resultado -->
+        <div class="result-area" id="resultArea">
+          <p class="result-placeholder">Ingresa la dosis de la mañana y/o tarde para calcular</p>
+        </div>
+
+        <div class="actions-row" id="actionsRow">
+          <button type="button" id="btnAddPatient" class="btn-add-patient">Agregar paciente</button>
+          <button type="button" id="btnClearAll" class="btn-clear-all">Limpiar todo</button>
+        </div>
+
+        <div class="update-box" id="updateBox">
+          <div class="update-header">
+            <span class="update-icon">🔄</span>
+            <p class="update-title">Actualizaciones</p>
+          </div>
+          <p class="update-status-text" id="updateStatusText">Aún no se ha buscado una actualización.</p>
+          <div class="update-progress hidden" id="updateProgress">
+            <div class="update-progress-bar" id="updateProgressBar"></div>
+          </div>
+          <div class="update-actions">
+            <button type="button" id="btnCheckUpdate" class="btn-update-check">Buscar actualización</button>
+            <button type="button" id="btnInstallUpdate" class="btn-update-install hidden">Instalar ahora</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Panel derecho: pacientes guardados -->
+      <div class="card records-card">
+        <div class="records-header">
+          <span class="records-icon">🗂️</span>
+          <div>
+            <p class="records-title">Pacientes guardados</p>
+            <p class="records-subtitle" id="patientsCount">0/200 pacientes</p>
+          </div>
+        </div>
+
+        <div class="records-filters">
+          <div class="records-filter">
+            <span class="records-filter-icon">🔎</span>
+            <input
+              type="text"
+              id="filterName"
+              class="records-filter-input"
+              placeholder="Buscar por nombre"
+              maxlength="80"
+            />
+            <button type="button" class="records-filter-clear" id="clearFilterName" title="Limpiar">&#10005;</button>
+          </div>
+          <div class="records-filter">
+            <span class="records-filter-icon">🆔</span>
+            <input
+              type="text"
+              id="filterRut"
+              class="records-filter-input"
+              placeholder="Buscar por RUT"
+              maxlength="20"
+            />
+            <button type="button" class="records-filter-clear" id="clearFilterRut" title="Limpiar">&#10005;</button>
+          </div>
+        </div>
+
+        <div id="patientsList">
+          <p class="records-empty">No hay pacientes guardados.</p>
+        </div>
+
+        <p class="records-footer">Carga o elimina pacientes guardados en <strong>tu equipo</strong> (maximo 200).</p>
+      </div>
+
+    </div>
+
+    <!-- Pie -->
+    <p class="footer-note" id="footerNote">Cálculo basado en — comprimidos por caja</p>
+
+  </div>
+
+  <!-- Modal: confirmar eliminacion -->
+  <div class="modal-overlay hidden" id="confirmModal">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+      <h2 class="modal-title" id="confirmModalTitle">Eliminar paciente</h2>
+      <p class="modal-confirm-text" id="confirmModalText"></p>
+      <div class="modal-actions">
+        <button type="button" id="btnConfirmCancel" class="btn-modal-secondary">Cancelar</button>
+        <button type="button" id="btnConfirmOk" class="btn-modal-danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: agregar paciente -->
+  <div class="modal-overlay hidden" id="patientModal">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="patientModalTitle">
+      <h2 class="modal-title" id="patientModalTitle">Agregar paciente</h2>
+      <p class="modal-subtitle"><strong>NOTA:</strong> Este registro se guarda solo en este equipo.</p>
+
+      <div class="field-group">
+        <label class="field-label">NOMBRE</label>
+        <div class="input-row">
+          <input type="text" id="modalPatientName" class="input-field text-left" maxlength="80" placeholder="Nombre del paciente" />
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">RUT</label>
+        <div class="input-row">
+          <input type="text" id="modalPatientRut" class="input-field text-left" maxlength="20" placeholder="RUT (ej: 12.345.678-9)" />
+        </div>
+        <p class="modal-field-feedback" id="modalRutLiveFeedback"></p>
+      </div>
+
+      <p class="modal-status" id="patientModalStatus"></p>
+
+      <div class="modal-actions">
+        <button type="button" id="btnCancelPatient" class="btn-modal-secondary">Cancelar</button>
+        <button type="button" id="btnSavePatient" class="btn-modal-primary">Guardar paciente</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

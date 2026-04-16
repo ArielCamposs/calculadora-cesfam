@@ -10,9 +10,13 @@
 
   <!-- Barra de título personalizada -->
   <div class="titlebar">
-    <div class="titlebar-drag"></div>
+    <div class="titlebar-drag">
+      <span class="titlebar-version" id="appVersionLabel">v-</span>
+    </div>
     <div class="titlebar-controls">
+      <button class="tb-btn tb-update" id="btnOpenUpdates" title="Actualizaciones">&#10227;</button>
       <button class="tb-btn tb-minimize" id="btnMinimize" title="Minimizar">&#8722;</button>
+      <button class="tb-btn tb-maximize" id="btnMaximize" title="Maximizar">&#9723;</button>
       <button class="tb-btn tb-close" id="btnClose" title="Cerrar">&#10005;</button>
     </div>
   </div>
@@ -124,21 +128,6 @@
           <button type="button" id="btnClearAll" class="btn-clear-all">Limpiar todo</button>
         </div>
 
-        <div class="update-box" id="updateBox">
-          <div class="update-header">
-            <span class="update-icon">🔄</span>
-            <p class="update-title">Actualizaciones</p>
-          </div>
-          <p class="update-status-text" id="updateStatusText">Aún no se ha buscado una actualización.</p>
-          <div class="update-progress hidden" id="updateProgress">
-            <div class="update-progress-bar" id="updateProgressBar"></div>
-          </div>
-          <div class="update-actions">
-            <button type="button" id="btnCheckUpdate" class="btn-update-check">Buscar actualización</button>
-            <button type="button" id="btnInstallUpdate" class="btn-update-install hidden">Instalar ahora</button>
-          </div>
-        </div>
-
       </div>
 
       <!-- Panel derecho: pacientes guardados -->
@@ -228,6 +217,39 @@
       <div class="modal-actions">
         <button type="button" id="btnCancelPatient" class="btn-modal-secondary">Cancelar</button>
         <button type="button" id="btnSavePatient" class="btn-modal-primary">Guardar paciente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: panel de actualizaciones -->
+  <div class="modal-overlay hidden" id="updatePanelModal">
+    <div class="modal-card update-panel-card" role="dialog" aria-modal="true" aria-labelledby="updatePanelTitle">
+      <div class="update-header">
+        <span class="update-icon">🔄</span>
+        <p class="update-title" id="updatePanelTitle">Actualizaciones</p>
+        <button type="button" id="btnCloseUpdates" class="update-panel-close" title="Cerrar">&times;</button>
+      </div>
+      <p class="update-status-text" id="updateStatusText">Buscando estado de actualización...</p>
+      <div class="update-progress hidden" id="updateProgress">
+        <div class="update-progress-bar" id="updateProgressBar"></div>
+      </div>
+      <div class="update-release-box">
+        <p class="update-release-title">Cambios de esta versión</p>
+        <p class="update-release-notes" id="updateReleaseNotes">Sin novedades publicadas aún.</p>
+      </div>
+      <div class="update-actions">
+        <button type="button" id="btnInstallUpdate" class="btn-update-install hidden">Instalar ahora</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: actualización obligatoria -->
+  <div class="modal-overlay hidden" id="forceUpdateModal">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="forceUpdateTitle">
+      <h2 class="modal-title" id="forceUpdateTitle">Actualización requerida</h2>
+      <p class="modal-confirm-text" id="forceUpdateText">Se encontró una nueva versión. Debes actualizar para continuar.</p>
+      <div class="modal-actions">
+        <button type="button" id="btnForceInstallUpdate" class="btn-modal-primary">Actualizar y reiniciar</button>
       </div>
     </div>
   </div>

@@ -5,6 +5,32 @@ let mainWindow = null;
 let listenersBound = false;
 let updateReadyToInstall = false;
 
+function extractReleaseNotes(releaseNotes) {
+  if (!releaseNotes) return '';
+
+  if (typeof releaseNotes === 'string') {
+    return releaseNotes.trim();
+  }
+
+  if (Array.isArray(releaseNotes)) {
+    return releaseNotes
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item.note === 'string') return item.note;
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n\n')
+      .trim();
+  }
+
+  if (typeof releaseNotes === 'object' && typeof releaseNotes.note === 'string') {
+    return releaseNotes.note.trim();
+  }
+
+  return '';
+}
+
 function sendToRenderer(channel, payload) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send(channel, payload);
@@ -49,6 +75,10 @@ function bindAutoUpdaterListeners() {
 
   autoUpdater.on('update-available', (info) => {
     updateReadyToInstall = false;
+    sendToRenderer('updater-update-available', {
+      version: info.version,
+      releaseNotes: extractReleaseNotes(info.releaseNotes)
+    });
     setStatus(`Nueva versión encontrada (${info.version}). Descargando...`, 'info');
     autoUpdater.downloadUpdate().catch((error) => {
       setStatus(`No se pudo descargar actualización: ${error.message}`, 'error');
@@ -70,7 +100,10 @@ function bindAutoUpdaterListeners() {
 
   autoUpdater.on('update-downloaded', (info) => {
     updateReadyToInstall = true;
-    sendToRenderer('updater-downloaded', { version: info.version });
+    sendToRenderer('updater-downloaded', {
+      version: info.version,
+      releaseNotes: extractReleaseNotes(info.releaseNotes)
+    });
     setStatus(`Actualización ${info.version} lista para instalar.`, 'ok');
   });
 
@@ -89,7 +122,8 @@ function initUpdater(win) {
   ipcMain.on('install-update-now', installDownloadedUpdate);
 
   if (app.isPackaged) {
-    setStatus('Auto-update activo. Puedes buscar nuevas versiones.', 'info');
+    setStatus('Buscando actualizaciones automáticamente...', 'info');
+    setTimeout(checkForUpdates, 1500);
   } else {
     setStatus('Modo desarrollo: auto-update deshabilitado hasta generar instalador.', 'warn');
   }

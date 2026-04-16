@@ -2,6 +2,9 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { initUpdater } = require('./updater');
 
+let closeBlockedByMandatoryUpdate = false;
+let allowCloseForUpdateInstall = false;
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 920,
@@ -17,6 +20,16 @@ function createWindow() {
     },
     backgroundColor: '#EEF1F8',
     icon: path.join(__dirname, 'assets', 'icon.png')
+  });
+
+  win.on('close', (event) => {
+    if (closeBlockedByMandatoryUpdate && !allowCloseForUpdateInstall) {
+      event.preventDefault();
+      win.webContents.send('force-update-close-blocked');
+      return;
+    }
+
+    allowCloseForUpdateInstall = false;
   });
 
   win.loadFile('index.html');
@@ -45,6 +58,29 @@ ipcMain.on('window-close', () => {
 
 ipcMain.on('window-minimize', () => {
   BrowserWindow.getFocusedWindow()?.minimize();
+});
+
+ipcMain.on('window-toggle-maximize', () => {
+  const win = BrowserWindow.getFocusedWindow();
+  if (!win) return;
+  if (win.isMaximized()) win.unmaximize();
+  else win.maximize();
+});
+
+ipcMain.handle('window-is-maximized', () => {
+  const win = BrowserWindow.getFocusedWindow();
+  return Boolean(win?.isMaximized());
+});
+
+ipcMain.handle('get-app-version', () => app.getVersion());
+
+ipcMain.on('set-close-blocked-by-update', (_event, blocked) => {
+  closeBlockedByMandatoryUpdate = Boolean(blocked);
+});
+
+ipcMain.on('allow-close-for-update-install', () => {
+  allowCloseForUpdateInstall = true;
+  closeBlockedByMandatoryUpdate = false;
 });
 
 ipcMain.on('open-devtools', () => {

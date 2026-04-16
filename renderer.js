@@ -9,6 +9,12 @@ document.getElementById('btnMinimize').addEventListener('click', () => {
   ipcRenderer.send('window-minimize');
 });
 
+const btnMaximize = document.getElementById('btnMaximize');
+btnMaximize.addEventListener('click', () => {
+  ipcRenderer.send('window-toggle-maximize');
+  setTimeout(syncMaximizeButtonState, 40);
+});
+
 // --- Elementos del DOM ---
 const totalPillsInput = document.getElementById('totalPills');
 const doseAMInput = document.getElementById('doseAM');
@@ -19,10 +25,12 @@ const footerNote = document.getElementById('footerNote');
 const actionsRow = document.getElementById('actionsRow');
 const btnClearAll = document.getElementById('btnClearAll');
 const btnAddPatient = document.getElementById('btnAddPatient');
+const btnOpenUpdates = document.getElementById('btnOpenUpdates');
+const appVersionLabel = document.getElementById('appVersionLabel');
 const updateStatusText = document.getElementById('updateStatusText');
 const updateProgress = document.getElementById('updateProgress');
 const updateProgressBar = document.getElementById('updateProgressBar');
-const btnCheckUpdate = document.getElementById('btnCheckUpdate');
+const updateReleaseNotes = document.getElementById('updateReleaseNotes');
 const btnInstallUpdate = document.getElementById('btnInstallUpdate');
 
 const patientsList = document.getElementById('patientsList');
@@ -44,6 +52,11 @@ const confirmModal = document.getElementById('confirmModal');
 const confirmModalText = document.getElementById('confirmModalText');
 const btnConfirmOk = document.getElementById('btnConfirmOk');
 const btnConfirmCancel = document.getElementById('btnConfirmCancel');
+const updatePanelModal = document.getElementById('updatePanelModal');
+const btnCloseUpdates = document.getElementById('btnCloseUpdates');
+const forceUpdateModal = document.getElementById('forceUpdateModal');
+const forceUpdateText = document.getElementById('forceUpdateText');
+const btnForceInstallUpdate = document.getElementById('btnForceInstallUpdate');
 
 // --- Persistencia local ---
 const PATIENTS_STORAGE_KEY = 'cesfam_saved_patients_v1';
@@ -53,6 +66,12 @@ let patients = [];
 let selectedPatientId = '';
 let filterName = '';
 let filterRut = '';
+let mandatoryUpdatePending = false;
+
+function setMandatoryUpdateState(active) {
+  mandatoryUpdatePending = Boolean(active);
+  ipcRenderer.send('set-close-blocked-by-update', mandatoryUpdatePending);
+}
 
 // --- Nombres de meses en espanol ---
 const MESES = [
@@ -164,6 +183,46 @@ function setUpdateProgress(percent) {
 function resetUpdateProgress() {
   updateProgress.classList.add('hidden');
   updateProgressBar.style.width = '0%';
+}
+
+function setUpdateReleaseNotes(rawText) {
+  const notes = String(rawText || '').trim();
+  updateReleaseNotes.textContent = notes || 'Sin novedades publicadas aún.';
+}
+
+async function syncMaximizeButtonState() {
+  try {
+    const maximized = await ipcRenderer.invoke('window-is-maximized');
+    btnMaximize.innerHTML = maximized ? '&#10064;' : '&#9723;';
+    btnMaximize.title = maximized ? 'Restaurar' : 'Maximizar';
+  } catch {
+    btnMaximize.innerHTML = '&#9723;';
+    btnMaximize.title = 'Maximizar';
+  }
+}
+
+async function loadAppVersionLabel() {
+  try {
+    const version = await ipcRenderer.invoke('get-app-version');
+    appVersionLabel.textContent = `v${version || '-'}`;
+  } catch {
+    appVersionLabel.textContent = 'v-';
+  }
+}
+
+function openForceUpdateModal(message, installReady = false) {
+  setMandatoryUpdateState(true);
+  forceUpdateText.textContent = message;
+  btnForceInstallUpdate.disabled = !installReady;
+  forceUpdateModal.classList.remove('hidden');
+}
+
+function openUpdatePanel() {
+  updatePanelModal.classList.remove('hidden');
+}
+
+function closeUpdatePanel() {
+  updatePanelModal.classList.add('hidden');
 }
 
 function setRutLiveFeedback(message, type) {
@@ -533,31 +592,64 @@ btnClearAll.addEventListener('click', clearAllFields);
 btnAddPatient.addEventListener('click', openPatientModal);
 btnCancelPatient.addEventListener('click', closePatientModal);
 btnSavePatient.addEventListener('click', savePatientFromModal);
-btnCheckUpdate.addEventListener('click', () => {
-  btnInstallUpdate.classList.add('hidden');
-  resetUpdateProgress();
-  ipcRenderer.send('check-for-updates');
-});
+btnOpenUpdates.addEventListener('click', openUpdatePanel);
+btnCloseUpdates.addEventListener('click', closeUpdatePanel);
 btnInstallUpdate.addEventListener('click', () => {
+  ipcRenderer.send('allow-close-for-update-install');
+  setMandatoryUpdateState(false);
+  ipcRenderer.send('install-update-now');
+});
+btnForceInstallUpdate.addEventListener('click', () => {
+  btnForceInstallUpdate.disabled = true;
+  forceUpdateText.textContent = 'Instalando actualización. La app se reiniciará...';
+  ipcRenderer.send('allow-close-for-update-install');
+  setMandatoryUpdateState(false);
   ipcRenderer.send('install-update-now');
 });
 
 ipcRenderer.on('updater-status', (_event, payload) => {
   if (!payload || typeof payload.message !== 'string') return;
   setUpdaterStatus(payload.message, payload.type);
+  if (mandatoryUpdatePending && payload.type === 'error') {
+    forceUpdateText.textContent = `No se pudo completar la actualización: ${payload.message}`;
+    btnForceInstallUpdate.disabled = false;
+  }
+});
+
+ipcRenderer.on('updater-update-available', (_event, payload) => {
+  const versionLabel = payload?.version ? ` ${payload.version}` : '';
+  setUpdateReleaseNotes(payload?.releaseNotes);
+  openForceUpdateModal(
+    `Se encontró una nueva versión${versionLabel}. La descarga comienza automáticamente y será obligatoria para continuar.`,
+    false
+  );
 });
 
 ipcRenderer.on('updater-progress', (_event, payload) => {
   if (!payload) return;
   setUpdateProgress(payload.percent);
   setUpdaterStatus(`Descargando actualización... ${Math.floor(payload.percent || 0)}%`, 'info');
+  if (mandatoryUpdatePending) {
+    forceUpdateText.textContent = `Descargando actualización obligatoria... ${Math.floor(payload.percent || 0)}%`;
+  }
 });
 
 ipcRenderer.on('updater-downloaded', (_event, payload) => {
   setUpdateProgress(100);
   const versionLabel = payload?.version ? ` ${payload.version}` : '';
+  setUpdateReleaseNotes(payload?.releaseNotes);
   setUpdaterStatus(`Actualización${versionLabel} descargada. Puedes instalar ahora.`, 'ok');
+  openForceUpdateModal(
+    `Actualización${versionLabel} lista. Debes instalar ahora para seguir usando la app.`,
+    true
+  );
   btnInstallUpdate.classList.remove('hidden');
+});
+
+ipcRenderer.on('force-update-close-blocked', () => {
+  if (!mandatoryUpdatePending) return;
+  forceUpdateText.textContent = 'Debes actualizar para cerrar o continuar usando la aplicación.';
+  forceUpdateModal.classList.remove('hidden');
 });
 
 modalPatientName.addEventListener('input', () => {
@@ -573,6 +665,10 @@ modalPatientRut.addEventListener('input', () => {
 
 patientModal.addEventListener('click', (e) => {
   if (e.target === patientModal) closePatientModal();
+});
+
+updatePanelModal.addEventListener('click', (e) => {
+  if (e.target === updatePanelModal) closeUpdatePanel();
 });
 
 btnConfirmOk.addEventListener('click', () => {
@@ -594,11 +690,16 @@ confirmModal.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (!confirmModal.classList.contains('hidden')) closeConfirmModal();
+    else if (!updatePanelModal.classList.contains('hidden')) closeUpdatePanel();
     else if (!patientModal.classList.contains('hidden')) closePatientModal();
   }
   if (e.ctrlKey && e.shiftKey && e.key === 'I') {
     ipcRenderer.send('open-devtools');
   }
+});
+
+window.addEventListener('resize', () => {
+  syncMaximizeButtonState();
 });
 
 patientsList.addEventListener('click', (event) => {
@@ -739,3 +840,6 @@ document.addEventListener('keydown', (e) => {
 loadPatientsFromStorage();
 renderPatientsList();
 calculate();
+setUpdateReleaseNotes('');
+loadAppVersionLabel();
+syncMaximizeButtonState();

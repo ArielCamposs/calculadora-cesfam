@@ -66,6 +66,22 @@ body {
 
 .tb-update {
   font-size: 13px;
+  position: relative;
+}
+
+.tb-update-icon {
+  line-height: 1;
+}
+
+.tb-update-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: 0 0 0 1px rgba(238, 241, 248, 0.9);
 }
 
 .tb-close:hover {
@@ -100,12 +116,16 @@ body {
   justify-content: center;
   margin: 0 auto 8px;
   box-shadow: 0 2px 8px rgba(100,130,200,0.18);
+  overflow: hidden;
 }
 
 .header-icon-svg {
-  width: 44px;
-  height: 44px;
+  width: 100%;
+  height: 100%;
   display: block;
+  object-fit: contain;
+  transform: scale(3.2);
+  transform-origin: center;
 }
 
 .header-title {
@@ -263,6 +283,36 @@ body {
   flex-shrink: 0;
 }
 
+.administrations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.administration-item {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+}
+
+.actions-row-small {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: -4px;
+}
+
+.daily-total-box {
+  background: #f8fbff;
+  border: 1px solid #dce8ff;
+  color: #2f5fb8;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
 /* ─── Área de resultado ─── */
 .result-area {
   flex: 0 0 auto;
@@ -278,6 +328,72 @@ body {
   color: #9ca3af;
   font-size: 13px;
   text-align: center;
+}
+
+.result-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.result-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.result-card-title {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: 0.2px;
+}
+
+.result-card-value {
+  font-size: 20px;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.result-card-sub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #64748b;
+}
+
+.warning-list,
+.detail-list {
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.warning-list {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+}
+
+.detail-list {
+  background: #f8fafc;
+  border: 1px solid #dbe5f3;
+  color: #334155;
+}
+
+.warning-list p,
+.detail-list p {
+  margin-bottom: 6px;
+}
+
+.warning-list p:last-child,
+.detail-list p:last-child {
+  margin-bottom: 0;
 }
 
 .actions-row {
@@ -880,6 +996,10 @@ body {
   .records-card {
     flex: 0 0 auto;
   }
+
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ─── Responsive: ventanas bajas ─── */
@@ -899,8 +1019,9 @@ body {
   }
 
   .header-icon-svg {
-    width: 36px;
-    height: 36px;
+    width: 100%;
+    height: 100%;
+    transform: scale(3);
   }
 
   .header-title {

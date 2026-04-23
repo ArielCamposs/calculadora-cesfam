@@ -1,4 +1,5 @@
 const { ipcRenderer } = require('electron');
+const calcularEntregaInsulinaFn = window.calcularEntregaInsulina || require('./calculo-insulina').calcularEntregaInsulina;
 
 // --- Controles de ventana ---
 document.getElementById('btnClose').addEventListener('click', () => {
@@ -16,9 +17,12 @@ btnMaximize.addEventListener('click', () => {
 });
 
 // --- Elementos del DOM ---
-const totalPillsInput = document.getElementById('totalPills');
-const doseAMInput = document.getElementById('doseAM');
-const dosePMInput = document.getElementById('dosePM');
+const vialCapacityUIInput = document.getElementById('vialCapacityUI');
+const administrationCountInput = document.getElementById('administrationCount');
+const administrationsList = document.getElementById('administrationsList');
+const dailyTotalBox = document.getElementById('dailyTotalBox');
+const btnAddAdministration = document.getElementById('btnAddAdministration');
+const btnRemoveAdministration = document.getElementById('btnRemoveAdministration');
 
 const resultArea = document.getElementById('resultArea');
 const footerNote = document.getElementById('footerNote');
@@ -26,6 +30,7 @@ const actionsRow = document.getElementById('actionsRow');
 const btnClearAll = document.getElementById('btnClearAll');
 const btnAddPatient = document.getElementById('btnAddPatient');
 const btnOpenUpdates = document.getElementById('btnOpenUpdates');
+const updateNotificationDot = document.getElementById('updateNotificationDot');
 const appVersionLabel = document.getElementById('appVersionLabel');
 const updateStatusText = document.getElementById('updateStatusText');
 const updateProgress = document.getElementById('updateProgress');
@@ -58,6 +63,17 @@ const forceUpdateModal = document.getElementById('forceUpdateModal');
 const forceUpdateText = document.getElementById('forceUpdateText');
 const btnForceInstallUpdate = document.getElementById('btnForceInstallUpdate');
 
+// --- Configuración operativa de insulina ---
+const DIAS_MINIMOS_TRATAMIENTO = 30;
+const DIAS_MAXIMOS_FRASCO_ABIERTO = 42;
+// Cambiar aquí si el CESFAM trabaja con otra capacidad base.
+const CAPACIDAD_FRASCO_UI_POR_DEFECTO = 1000;
+const MAX_ADMINISTRACIONES = 10;
+
+/**
+ * @typedef {{ id: string; nombre: string; dosisUI: number }} AdministracionUI
+ */
+
 // --- Persistencia local ---
 const PATIENTS_STORAGE_KEY = 'cesfam_saved_patients_v1';
 const MAX_PATIENTS = 200;
@@ -67,17 +83,20 @@ let selectedPatientId = '';
 let filterName = '';
 let filterRut = '';
 let mandatoryUpdatePending = false;
+let updateNotificationPending = false;
+let administrationIdSequence = 1;
+/** @type {AdministracionUI[]} */
+let administracionesState = [];
 
 function setMandatoryUpdateState(active) {
   mandatoryUpdatePending = Boolean(active);
   ipcRenderer.send('set-close-blocked-by-update', mandatoryUpdatePending);
 }
 
-// --- Nombres de meses en espanol ---
-const MESES = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-];
+function setUpdateNotification(visible) {
+  updateNotificationPending = Boolean(visible);
+  updateNotificationDot.classList.toggle('hidden', !updateNotificationPending);
+}
 
 function sanitizeIntInput(input, minValue) {
   if (input.value === '') return;
@@ -89,7 +108,11 @@ function sanitizeIntInput(input, minValue) {
   }
 
   const min = minValue ?? 0;
-  const max = input.id === 'totalPills' ? 99999 : 99;
+  const maxByInputId = {
+    vialCapacityUI: 99999,
+    administrationCount: MAX_ADMINISTRACIONES
+  };
+  const max = maxByInputId[input.id] ?? 999;
   const clamped = n < min ? min : n > max ? max : n;
   input.value = String(clamped);
 }
@@ -157,6 +180,104 @@ function escapeHtml(text) {
 
 function setActionsVisible(visible) {
   actionsRow.style.display = visible ? 'flex' : 'none';
+}
+
+function formatNumber(value, decimals = 2) {
+  return Number(value).toLocaleString('es-CL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals
+  });
+}
+
+function getDeliveryDayInfo(fechaISO) {
+  const parsed = new Date(`${fechaISO}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return { nombreDia: 'desconocido', esHabil: false, estadoTexto: 'No hábil' };
+  }
+
+  const nombreDia = parsed.toLocaleDateString('es-CL', { weekday: 'long' });
+  const day = parsed.getDay();
+  const esHabil = day !== 0;
+  const estadoTexto = day === 6 ? 'Hábil (sábado operativo CESFAM)' : (esHabil ? 'Hábil' : 'No hábil');
+  return { nombreDia, esHabil, estadoTexto };
+}
+
+function getDefaultAdministrationName(position) {
+  if (position === 0) return 'AM';
+  if (position === 1) return 'PM';
+  return `Administración ${position + 1}`;
+}
+
+function createAdministration(initialName = '', initialDose = 0) {
+  const position = administracionesState.length;
+  const safeName = initialName.trim() || getDefaultAdministrationName(position);
+  const safeDose = Number.isFinite(initialDose) && initialDose >= 0 ? initialDose : 0;
+  const next = {
+    id: `adm-${administrationIdSequence++}`,
+    nombre: safeName,
+    dosisUI: safeDose
+  };
+  administracionesState.push(next);
+}
+
+function syncAdministrationCountInput() {
+  administrationCountInput.value = String(administracionesState.length);
+  btnRemoveAdministration.disabled = administracionesState.length <= 1;
+}
+
+function renderAdministrationsInputs() {
+  administrationsList.innerHTML = administracionesState.map((admin, index) => `
+    <div class="administration-item" data-admin-id="${escapeHtml(admin.id)}">
+      <div class="input-row">
+        <input
+          type="text"
+          class="input-field text-left administration-name"
+          value="${escapeHtml(admin.nombre)}"
+          maxlength="30"
+          placeholder="${escapeHtml(getDefaultAdministrationName(index))}"
+        />
+      </div>
+      <div class="input-row">
+        <input
+          type="number"
+          class="input-field administration-dose"
+          value="${admin.dosisUI > 0 ? String(admin.dosisUI) : ''}"
+          min="0"
+          max="999"
+          step="1"
+          placeholder="0"
+        />
+        <span class="input-unit">UI</span>
+      </div>
+    </div>
+  `).join('');
+
+  syncAdministrationCountInput();
+}
+
+function setAdministrationCount(nextCount) {
+  const safeCount = Math.max(1, Math.min(MAX_ADMINISTRACIONES, Math.trunc(nextCount)));
+  while (administracionesState.length < safeCount) createAdministration();
+  while (administracionesState.length > safeCount) administracionesState.pop();
+  renderAdministrationsInputs();
+}
+
+function getAdministracionesFromUI() {
+  return administracionesState.map((admin, index) => {
+    const row = administrationsList.querySelector(`[data-admin-id="${admin.id}"]`);
+    if (!row) return { nombre: admin.nombre, dosisUI: admin.dosisUI };
+
+    const nameInput = row.querySelector('.administration-name');
+    const doseInput = row.querySelector('.administration-dose');
+
+    const nextName = (nameInput?.value || '').trim() || getDefaultAdministrationName(index);
+    const rawDose = Number(doseInput?.value);
+    const nextDose = Number.isFinite(rawDose) && rawDose >= 0 ? Math.trunc(rawDose) : 0;
+
+    admin.nombre = nextName;
+    admin.dosisUI = nextDose;
+    return { nombre: nextName, dosisUI: nextDose };
+  });
 }
 
 function setModalStatus(message, type) {
@@ -266,102 +387,106 @@ function updateRutLiveFeedback() {
 }
 
 function getCurrentFormData() {
+  const administraciones = getAdministracionesFromUI();
+  const dosisDiariaTotal = administraciones.reduce((acc, item) => acc + item.dosisUI, 0);
+
   return {
-    totalPills: parseInt(totalPillsInput.value, 10) || 0,
-    doseAM: parseInt(doseAMInput.value, 10) || 0,
-    dosePM: parseInt(dosePMInput.value, 10) || 0
+    capacidadFrascoUI: parseInt(vialCapacityUIInput.value, 10) || 0,
+    administraciones,
+    dosisDiariaTotal
   };
 }
 
 // --- Calculo principal ---
 function calculate() {
-  const total = parseInt(totalPillsInput.value, 10) || 0;
-  const am = parseInt(doseAMInput.value, 10) || 0;
-  const pm = parseInt(dosePMInput.value, 10) || 0;
-  const perDay = am + pm;
+  const form = getCurrentFormData();
+  dailyTotalBox.textContent = `Dosis diaria total: ${form.dosisDiariaTotal} UI`;
+  footerNote.textContent = `Reglas activas: cobertura mínima ${DIAS_MINIMOS_TRATAMIENTO} días, frasco abierto máximo ${DIAS_MAXIMOS_FRASCO_ABIERTO} días, entrega de lunes a sábado (no domingos ni feriados).`;
 
-  footerNote.textContent = total > 0
-    ? `Calculo basado en ${total} comprimidos por caja`
-    : 'Calculo basado en - comprimidos por caja';
-
-  if (perDay === 0 || total === 0) {
+  if (form.capacidadFrascoUI <= 0) {
     setActionsVisible(false);
-    resultArea.innerHTML = `<p class="result-placeholder">
-      ${total === 0
-        ? 'Ingresa la cantidad de comprimidos por caja'
-        : 'Ingresa la dosis de la manana y/o tarde para calcular'}
-    </p>`;
+    resultArea.innerHTML = '<p class="result-placeholder">Ingresa una capacidad de frasco mayor a 0 UI.</p>';
     return;
   }
 
-  const fullDays = Math.floor(total / perDay);
-  const consumed = fullDays * perDay;
-  const leftover = total - consumed;
+  if (form.administraciones.length === 0) {
+    setActionsVisible(false);
+    resultArea.innerHTML = '<p class="result-placeholder">Debes ingresar al menos una administración.</p>';
+    return;
+  }
 
-  if (fullDays === 0) {
-    setActionsVisible(true);
+  if (form.administraciones.some((admin) => admin.dosisUI < 0)) {
+    setActionsVisible(false);
+    resultArea.innerHTML = '<p class="result-placeholder">No se permiten dosis negativas.</p>';
+    return;
+  }
+
+  if (form.dosisDiariaTotal <= 0) {
+    setActionsVisible(false);
+    resultArea.innerHTML = '<p class="result-placeholder">La dosis diaria total debe ser mayor a 0 UI para calcular.</p>';
+    return;
+  }
+
+  try {
+    const resultado = calcularEntregaInsulinaFn({
+      administraciones: form.administraciones,
+      capacidadFrascoUI: form.capacidadFrascoUI,
+      diasMinimosTratamiento: DIAS_MINIMOS_TRATAMIENTO,
+      diasMaximosFrascoAbierto: DIAS_MAXIMOS_FRASCO_ABIERTO
+    });
+
+    const warningsHtml = resultado.advertencias.length > 0
+      ? `<div class="warning-list">
+          <p><strong>Advertencias operativas</strong></p>
+          ${resultado.advertencias.map((item) => `<p>- ${escapeHtml(item)}</p>`).join('')}
+        </div>`
+      : '';
+
+    const entregaInfo = getDeliveryDayInfo(resultado.fechaProximaEntregaHabilISO);
+
     resultArea.innerHTML = `
-      <div class="result-main">
-        <div class="result-badge badge-warning badge-insufficient">
-          <div class="insufficient-line">
-            No alcanzan los comprimidos: con AM+PM = ${perDay}, la caja tiene
-          </div>
-          <div class="insufficient-num">
-            <span class="num-red">${total}</span>
-          </div>
+      <div class="result-grid">
+        <div class="result-card">
+          <p class="result-card-title">Dosis diaria total</p>
+          <p class="result-card-value">${formatNumber(resultado.dosisDiariaTotal, 0)} UI</p>
+        </div>
+        <div class="result-card">
+          <p class="result-card-title">Días que rinde 1 frasco</p>
+          <p class="result-card-value">${formatNumber(resultado.diasQueRindeUnFrasco, 0)}</p>
+        </div>
+        <div class="result-card">
+          <p class="result-card-title">Frascos a entregar</p>
+          <p class="result-card-value">${resultado.cantidadFrascos}</p>
+          <p class="result-card-sub">Mínimo ${DIAS_MINIMOS_TRATAMIENTO} días</p>
+        </div>
+        <div class="result-card">
+          <p class="result-card-title">Cobertura total</p>
+          <p class="result-card-value">${formatNumber(resultado.diasCoberturaTotal, 0)} días</p>
+        </div>
+        <div class="result-card">
+          <p class="result-card-title">Próxima entrega hábil</p>
+          <p class="result-card-value">${escapeHtml(resultado.fechaProximaEntregaHabilISO)}</p>
+          <p class="result-card-sub">Día: ${escapeHtml(entregaInfo.nombreDia)} | ${escapeHtml(entregaInfo.estadoTexto)}</p>
+          <p class="result-card-sub">Ajuste por no hábil: adelanto de ${formatNumber(resultado.diasNoHabilesAdicionales, 0)} días</p>
+        </div>
+        <div class="result-card">
+          <p class="result-card-title">Tipo de jeringa</p>
+          <p class="result-card-value">${escapeHtml(resultado.tipoJeringa)}</p>
+          <p class="result-card-sub">Regla actual: &lt;50 UI = 50UI | &gt;100 UI = 100UI</p>
+        </div>
+        <div class="result-card">
+          <p class="result-card-title">Jeringas a entregar</p>
+          <p class="result-card-value">${resultado.cantidadJeringas}</p>
+          <p class="result-card-sub">${resultado.administracionesDiarias} administraciones/día</p>
         </div>
       </div>
+      ${warningsHtml}
     `;
-    return;
+    setActionsVisible(true);
+  } catch (error) {
+    setActionsVisible(false);
+    resultArea.innerHTML = `<p class="result-placeholder">${escapeHtml(error.message || 'No se pudo calcular la entrega.')}</p>`;
   }
-
-  const today = new Date();
-  const endDate = new Date(today);
-  endDate.setDate(today.getDate() + Math.max(fullDays - 1, 0));
-
-  const dayNum = endDate.getDate();
-  const monthName = MESES[endDate.getMonth()];
-  const yearEnd = endDate.getFullYear();
-  const currentYear = today.getFullYear();
-  const yearLabel = yearEnd !== currentYear ? ` ${yearEnd}` : '';
-
-  let leftoverBadge = '';
-  let leftoverReason = '';
-
-  if (leftover > 0) {
-    leftoverBadge = `
-      <div class="result-badge badge-leftover">
-        Sobran ${leftover} comp. el ultimo dia
-      </div>`;
-
-    leftoverReason = `
-      <p class="leftover-reason">
-        Esto pasa porque la dosis diaria es <strong>${perDay}</strong> comp. en total, y
-        <strong>${total}</strong> comp. por caja no se divide exactamente por esa cantidad.
-      </p>
-    `;
-  } else {
-    leftoverBadge = `
-      <div class="result-badge badge-success">
-        Sin sobrante - caja exacta
-      </div>`;
-  }
-
-  resultArea.innerHTML = `
-    <div class="result-main">
-      <div class="result-days">${fullDays}</div>
-      <div class="result-days-label">dias de duracion</div>
-      <div class="result-date-row">
-        <div class="result-badge">
-          Se termina el ${dayNum} de ${monthName}${yearLabel}
-        </div>
-        ${leftoverBadge}
-      </div>
-      ${leftoverReason}
-    </div>
-  `;
-
-  setActionsVisible(true);
 }
 
 // --- Pacientes guardados (panel derecho) ---
@@ -417,7 +542,9 @@ function renderPatientsList() {
 
   const html = filtered.map((p) => {
     const activeClass = p.id === selectedPatientId ? 'active' : '';
-    const summary = `${p.totalPills || 0} comp. | ${p.doseAM || 0} AM + ${p.dosePM || 0} PM`;
+    const dosisDiaria = Number.isFinite(p.dosisDiariaTotal) ? p.dosisDiariaTotal : 0;
+    const administraciones = Array.isArray(p.administraciones) ? p.administraciones.length : 0;
+    const summary = `Frasco ${p.capacidadFrascoUI || 0} UI | ${dosisDiaria} UI/día | ${administraciones} admin/día`;
 
     return `
       <div class="patient-item ${activeClass}">
@@ -439,9 +566,19 @@ function loadPatient(id) {
   if (!patient) return;
 
   selectedPatientId = id;
-  totalPillsInput.value = patient.totalPills ? String(patient.totalPills) : '';
-  doseAMInput.value = patient.doseAM ? String(patient.doseAM) : '';
-  dosePMInput.value = patient.dosePM ? String(patient.dosePM) : '';
+  const administracionesPaciente = Array.isArray(patient.administraciones) ? patient.administraciones : [];
+  administracionesState = [];
+  administrationIdSequence = 1;
+  administracionesPaciente.forEach((admin) => {
+    createAdministration(admin?.nombre || '', Number(admin?.dosisUI) || 0);
+  });
+  if (administracionesState.length === 0) {
+    createAdministration('AM', 0);
+    createAdministration('PM', 0);
+  }
+
+  vialCapacityUIInput.value = patient.capacidadFrascoUI ? String(patient.capacidadFrascoUI) : '';
+  renderAdministrationsInputs();
 
   calculate();
   renderPatientsList();
@@ -541,7 +678,7 @@ function savePatientFromModal() {
   }
 
   const form = getCurrentFormData();
-  if (form.totalPills <= 0 || (form.doseAM + form.dosePM) <= 0) {
+  if (form.capacidadFrascoUI <= 0 || form.dosisDiariaTotal <= 0) {
     setModalStatus('Primero ingresa un calculo valido para guardar.', 'status-warn');
     return;
   }
@@ -550,9 +687,9 @@ function savePatientFromModal() {
     id: normalizedRut,
     name,
     rut: formattedRut,
-    totalPills: form.totalPills,
-    doseAM: form.doseAM,
-    dosePM: form.dosePM,
+    capacidadFrascoUI: form.capacidadFrascoUI,
+    administraciones: form.administraciones,
+    dosisDiariaTotal: form.dosisDiariaTotal,
     savedAt: Date.now()
   };
 
@@ -568,24 +705,56 @@ function savePatientFromModal() {
 }
 
 function clearAllFields() {
-  totalPillsInput.value = '';
-  doseAMInput.value = '';
-  dosePMInput.value = '';
+  vialCapacityUIInput.value = String(CAPACIDAD_FRASCO_UI_POR_DEFECTO);
+  administracionesState = [];
+  administrationIdSequence = 1;
+  createAdministration('AM', 0);
+  createAdministration('PM', 0);
+  renderAdministrationsInputs();
 
   selectedPatientId = '';
   calculate();
   renderPatientsList();
-  totalPillsInput.focus();
+  vialCapacityUIInput.focus();
 }
 
 // --- Eventos ---
-[totalPillsInput, doseAMInput, dosePMInput].forEach((input) => {
+[vialCapacityUIInput, administrationCountInput].forEach((input) => {
   input.addEventListener('input', () => {
-    if (input === totalPillsInput) sanitizeIntInput(input, 1);
-    else sanitizeIntInput(input, 0);
+    if (input === vialCapacityUIInput) sanitizeIntInput(input, 1);
+    else if (input === administrationCountInput) sanitizeIntInput(input, 1);
+
+    if (input === administrationCountInput) {
+      setAdministrationCount(parseInt(administrationCountInput.value, 10) || 1);
+    }
 
     calculate();
   });
+});
+
+administrationsList.addEventListener('input', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+
+  if (target.classList.contains('administration-dose')) sanitizeIntInput(target, 0);
+  if (target.classList.contains('administration-name')) {
+    target.value = target.value.replace(/\s{2,}/g, ' ').slice(0, 30);
+  }
+  calculate();
+});
+
+btnAddAdministration.addEventListener('click', () => {
+  if (administracionesState.length >= MAX_ADMINISTRACIONES) return;
+  createAdministration();
+  renderAdministrationsInputs();
+  calculate();
+});
+
+btnRemoveAdministration.addEventListener('click', () => {
+  if (administracionesState.length <= 1) return;
+  administracionesState.pop();
+  renderAdministrationsInputs();
+  calculate();
 });
 
 btnClearAll.addEventListener('click', clearAllFields);
@@ -595,11 +764,13 @@ btnSavePatient.addEventListener('click', savePatientFromModal);
 btnOpenUpdates.addEventListener('click', openUpdatePanel);
 btnCloseUpdates.addEventListener('click', closeUpdatePanel);
 btnInstallUpdate.addEventListener('click', () => {
+  setUpdateNotification(false);
   ipcRenderer.send('allow-close-for-update-install');
   setMandatoryUpdateState(false);
   ipcRenderer.send('install-update-now');
 });
 btnForceInstallUpdate.addEventListener('click', () => {
+  setUpdateNotification(false);
   btnForceInstallUpdate.disabled = true;
   forceUpdateText.textContent = 'Instalando actualización. La app se reiniciará...';
   ipcRenderer.send('allow-close-for-update-install');
@@ -617,6 +788,7 @@ ipcRenderer.on('updater-status', (_event, payload) => {
 });
 
 ipcRenderer.on('updater-update-available', (_event, payload) => {
+  setUpdateNotification(true);
   const versionLabel = payload?.version ? ` ${payload.version}` : '';
   setUpdateReleaseNotes(payload?.releaseNotes);
   openForceUpdateModal(
@@ -635,6 +807,7 @@ ipcRenderer.on('updater-progress', (_event, payload) => {
 });
 
 ipcRenderer.on('updater-downloaded', (_event, payload) => {
+  setUpdateNotification(true);
   setUpdateProgress(100);
   const versionLabel = payload?.version ? ` ${payload.version}` : '';
   setUpdateReleaseNotes(payload?.releaseNotes);
@@ -644,6 +817,10 @@ ipcRenderer.on('updater-downloaded', (_event, payload) => {
     true
   );
   btnInstallUpdate.classList.remove('hidden');
+});
+
+ipcRenderer.on('updater-no-update', () => {
+  setUpdateNotification(false);
 });
 
 ipcRenderer.on('force-update-close-blocked', () => {
@@ -753,9 +930,7 @@ clearFilterRutBtn.addEventListener('click', () => {
   filterRutInput.focus();
 });
 
-// --- Seed de pacientes de prueba (solo desarrollo) ---
-// Atajo: Ctrl+Shift+D genera 100 pacientes de prueba.
-
+// --- Utilidades ---
 function computeDv(numStr) {
   let sum = 0;
   let multiplier = 2;
@@ -769,10 +944,11 @@ function computeDv(numStr) {
   return String(mod);
 }
 
+// --- Seed de pacientes de prueba (solo desarrollo) ---
+// Atajo: Ctrl+Shift+D genera 100 pacientes de prueba.
 function generateTestPatients(count) {
   const available = MAX_PATIENTS - patients.length;
   if (available <= 0) {
-    console.warn(`[seed] Limite alcanzado (${MAX_PATIENTS}). No se agrego ningun paciente.`);
     return;
   }
   const targetCount = Math.min(count, available);
@@ -812,13 +988,20 @@ function generateTestPatients(count) {
     usedRuts.add(rutId);
     usedNames.add(fullName);
 
+    const doseAM = 5 + Math.floor(Math.random() * 35);
+    const dosePM = 5 + Math.floor(Math.random() * 35);
+    const administraciones = [
+      { nombre: 'AM', dosisUI: doseAM },
+      { nombre: 'PM', dosisUI: dosePM }
+    ];
+
     generated.push({
       id: rutId,
       name: fullName,
       rut: formatRutChile(rutId),
-      totalPills: [30, 60, 100, 120, 200, 500, 1000][Math.floor(Math.random() * 7)],
-      doseAM: 1 + Math.floor(Math.random() * 3),
-      dosePM: 1 + Math.floor(Math.random() * 3),
+      capacidadFrascoUI: CAPACIDAD_FRASCO_UI_POR_DEFECTO,
+      administraciones,
+      dosisDiariaTotal: doseAM + dosePM,
       savedAt: Date.now() - Math.floor(Math.random() * 1000 * 60 * 60 * 24 * 30)
     });
   }
@@ -826,7 +1009,6 @@ function generateTestPatients(count) {
   patients = [...generated, ...patients].slice(0, MAX_PATIENTS);
   persistPatients();
   renderPatientsList();
-  console.log(`[seed] Generados ${generated.length} pacientes de prueba.`);
 }
 
 document.addEventListener('keydown', (e) => {
@@ -837,6 +1019,13 @@ document.addEventListener('keydown', (e) => {
 });
 
 // --- Init ---
+if (!vialCapacityUIInput.value) {
+  vialCapacityUIInput.value = String(CAPACIDAD_FRASCO_UI_POR_DEFECTO);
+}
+createAdministration('AM', 0);
+createAdministration('PM', 0);
+renderAdministrationsInputs();
+
 loadPatientsFromStorage();
 renderPatientsList();
 calculate();

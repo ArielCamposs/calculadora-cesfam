@@ -1,6 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { initUpdater } = require('./updater');
+const APP_ICON_PATH = path.join(__dirname, 'assets', 'iconocalculadora.ico');
+const APP_USER_MODEL_ID = 'com.ariel.calculadorafarmacia';
 
 let closeBlockedByMandatoryUpdate = false;
 let allowCloseForUpdateInstall = false;
@@ -19,8 +21,9 @@ function createWindow() {
       contextIsolation: false
     },
     backgroundColor: '#EEF1F8',
-    icon: path.join(__dirname, 'assets', 'icon.png')
+    icon: APP_ICON_PATH
   });
+  win.setIcon(APP_ICON_PATH);
 
   win.on('close', (event) => {
     if (closeBlockedByMandatoryUpdate && !allowCloseForUpdateInstall) {
@@ -37,6 +40,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
   const win = createWindow();
   initUpdater(win);
 

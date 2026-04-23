@@ -1,26 +1,31 @@
 {
   "name": "calculadora-farmacia",
-  "version": "1.0.4",
-  "description": "Calculadora de dosis de medicamentos",
+  "version": "1.0.7",
+  "description": "Calculadora de insulina",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --win",
-    "build:publish": "electron-builder --win --publish always"
+    "build:publish": "electron-builder --win --publish always",
+    "test:insulina": "node tests/calculo-insulina.test.js",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "Ariel",
   "license": "MIT",
   "devDependencies": {
     "electron": "^34.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5",
+    "typescript": "^6.0.3"
   },
   "build": {
     "appId": "com.ariel.calculadorafarmacia",
     "productName": "Calculadora de Dosis",
     "win": {
       "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "assets/iconocalculadora.ico"
     },
     "nsis": {
       "oneClick": false,

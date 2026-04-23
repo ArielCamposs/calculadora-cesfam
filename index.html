@@ -14,7 +14,10 @@
       <span class="titlebar-version" id="appVersionLabel">v-</span>
     </div>
     <div class="titlebar-controls">
-      <button class="tb-btn tb-update" id="btnOpenUpdates" title="Actualizaciones">&#10227;</button>
+      <button class="tb-btn tb-update" id="btnOpenUpdates" title="Actualizaciones">
+        <span class="tb-update-icon" aria-hidden="true">&#10227;</span>
+        <span class="tb-update-dot hidden" id="updateNotificationDot" aria-hidden="true"></span>
+      </button>
       <button class="tb-btn tb-minimize" id="btnMinimize" title="Minimizar">&#8722;</button>
       <button class="tb-btn tb-maximize" id="btnMaximize" title="Maximizar">&#9723;</button>
       <button class="tb-btn tb-close" id="btnClose" title="Cerrar">&#10005;</button>
@@ -27,20 +30,10 @@
     <!-- Encabezado -->
     <div class="header">
       <div class="header-icon" aria-hidden="true">
-        <svg class="header-icon-svg" viewBox="0 0 64 64" role="img">
-          <rect x="14" y="8" width="36" height="48" rx="8" fill="#f7fbff" stroke="#7da2ee" stroke-width="3"></rect>
-          <rect x="20" y="14" width="24" height="10" rx="3" fill="#dbe8ff"></rect>
-          <rect x="20" y="28" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
-          <rect x="29" y="28" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
-          <rect x="38" y="28" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
-          <rect x="20" y="37" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
-          <rect x="29" y="37" width="7" height="7" rx="2" fill="#8cb0f3"></rect>
-          <rect x="38" y="37" width="7" height="16" rx="2" fill="#5f8ae8"></rect>
-          <rect x="20" y="46" width="16" height="7" rx="2" fill="#8cb0f3"></rect>
-        </svg>
+        <img class="header-icon-svg" src="assets/iconocalculadora.png" alt="" />
       </div>
-      <h1 class="header-title">Calculadora de dosis</h1>
-      <p class="header-subtitle">Calculadora de duración por caja</p>
+      <h1 class="header-title">Calculadora de entrega de insulina</h1>
+      <p class="header-subtitle">CESFAM - cobertura, frascos y jeringas</p>
     </div>
 
     <!-- Layout principal -->
@@ -49,78 +42,62 @@
       <!-- Panel izquierdo: calculadora -->
       <div class="card calc-card">
 
-        <!-- Comprimidos por caja -->
+        <!-- Capacidad del frasco -->
         <div class="field-group">
           <label class="field-label">
             <span class="label-icon">💊</span>
-            COMPRIMIDOS POR CAJA
+            CAPACIDAD DEL FRASCO
           </label>
           <div class="input-row">
             <input
               type="number"
-              id="totalPills"
+              id="vialCapacityUI"
               class="input-field"
-              placeholder="0"
+              placeholder="1000"
               min="1"
               max="99999"
               step="1"
             />
-            <span class="input-unit">comp.</span>
+            <span class="input-unit">UI</span>
           </div>
         </div>
 
         <div class="divider"></div>
 
-        <!-- Dosis AM y PM -->
-        <div class="dose-row">
-          <div class="dose-group">
-            <label class="field-label">
-              <span class="label-icon">🌅</span>
-              DOSIS AM
-            </label>
-            <div class="input-row">
-              <input
-                type="number"
-                id="doseAM"
-                class="input-field"
-                placeholder="0"
-                min="0"
-                max="99"
-                step="1"
-              />
-              <span class="input-unit">comp.</span>
-            </div>
-            <span class="dose-hint">Mañana</span>
-          </div>
-
-          <div class="dose-plus">+</div>
-
-          <div class="dose-group">
-            <label class="field-label">
-              <span class="label-icon">🌙</span>
-              DOSIS PM
-            </label>
-            <div class="input-row">
-              <input
-                type="number"
-                id="dosePM"
-                class="input-field"
-                placeholder="0"
-                min="0"
-                max="99"
-                step="1"
-              />
-              <span class="input-unit">comp.</span>
-            </div>
-            <span class="dose-hint">Noche</span>
+        <!-- Administraciones -->
+        <div class="field-group">
+          <label class="field-label">
+            <span class="label-icon">🕒</span>
+            ADMINISTRACIONES DIARIAS
+          </label>
+          <div class="input-row">
+            <input
+              type="number"
+              id="administrationCount"
+              class="input-field"
+              placeholder="2"
+              min="1"
+              max="10"
+              step="1"
+            />
+            <span class="input-unit">al día</span>
           </div>
         </div>
 
+        <div class="administrations-list" id="administrationsList"></div>
+
+        <div class="actions-row-small">
+          <button type="button" id="btnAddAdministration" class="btn-add-patient">Agregar administración</button>
+          <button type="button" id="btnRemoveAdministration" class="btn-clear-all">Quitar última</button>
+        </div>
+
         <div class="divider"></div>
+
+        <div class="daily-total-box" id="dailyTotalBox">Dosis diaria total: 0 UI</div>
 
         <!-- Resultado -->
         <div class="result-area" id="resultArea">
-          <p class="result-placeholder">Ingresa la dosis de la mañana y/o tarde para calcular</p>
+          <p class="result-placeholder">Ingresa administraciones y capacidad del frasco para calcular</p>
         </div>
 
         <div class="actions-row" id="actionsRow">
@@ -175,7 +152,7 @@
     </div>
 
     <!-- Pie -->
-    <p class="footer-note" id="footerNote">Cálculo basado en — comprimidos por caja</p>
+    <p class="footer-note" id="footerNote">Parámetros por defecto: mínimo 30 días, frasco abierto máximo 42 días</p>
 
   </div>
 
@@ -254,6 +231,7 @@
     </div>
   </div>
 
+  <script src="calculo-insulina.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

@@ -86,6 +86,7 @@ function bindAutoUpdaterListeners() {
   });
 
   autoUpdater.on('update-not-available', () => {
+    sendToRenderer('updater-no-update', {});
     setStatus('Ya estás en la última versión.', 'ok');
   });
 

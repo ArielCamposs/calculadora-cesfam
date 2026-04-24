@@ -2,7 +2,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('node:fs/promises');
 const { initUpdater } = require('./updater');
-const APP_ICON_PATH = path.join(__dirname, 'assets', 'logo-insulina1.png');
+const APP_ICON_PATH = path.join(__dirname, 'assets', 'logo-insulina-ico.ico');
 const APP_USER_MODEL_ID = 'com.ariel.calculadorafarmacia';
 
 let closeBlockedByMandatoryUpdate = false;

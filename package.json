@@ -1,6 +1,6 @@
 {
   "name": "calculadora-farmacia",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Calculadora de insulina",
   "main": "main.js",
   "scripts": {
@@ -22,10 +22,10 @@
   },
   "build": {
     "appId": "com.ariel.calculadorafarmacia",
-    "productName": "Calculadora de Dosis",
+    "productName": "Calculadora de Insulina",
     "win": {
       "target": "nsis",
-      "icon": "assets/logo-insulina1.png"
+      "icon": "assets/logo-insulina-ico.ico"
     },
     "nsis": {
       "oneClick": false,

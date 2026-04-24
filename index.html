@@ -30,7 +30,7 @@
     <!-- Encabezado -->
     <div class="header">
       <div class="header-icon" aria-hidden="true">
-        <img class="header-icon-svg" src="assets/iconocalculadora.png" alt="" />
+        <img class="header-icon-svg" src="assets/logo-insulina-svg.svg" alt="" />
       </div>
       <h1 class="header-title">Calculadora de entrega de insulina</h1>
       <p class="header-subtitle">CESFAM - cobertura, frascos y jeringas</p>
@@ -89,20 +89,21 @@
         <div class="actions-row-small">
           <button type="button" id="btnAddAdministration" class="btn-add-patient">Agregar administración</button>
           <button type="button" id="btnRemoveAdministration" class="btn-clear-all">Quitar última</button>
+          <button type="button" id="btnToggleFarMode" class="btn-accessibility-toggle" aria-pressed="false">Modo de lejos: OFF</button>
         </div>
 
         <div class="divider"></div>
 
         <div class="daily-total-box" id="dailyTotalBox">Dosis diaria total: 0 UI</div>
 
-        <!-- Resultado -->
-        <div class="result-area" id="resultArea">
-          <p class="result-placeholder">Ingresa administraciones y capacidad del frasco para calcular</p>
-        </div>
-
         <div class="actions-row" id="actionsRow">
           <button type="button" id="btnAddPatient" class="btn-add-patient">Agregar paciente</button>
           <button type="button" id="btnClearAll" class="btn-clear-all">Limpiar todo</button>
+        </div>
+
+        <!-- Resultado -->
+        <div class="result-area" id="resultArea">
+          <p class="result-placeholder">Ingresa administraciones y capacidad del frasco para calcular</p>
         </div>
 
       </div>

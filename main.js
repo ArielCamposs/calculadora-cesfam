@@ -1,7 +1,8 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('node:fs/promises');
 const { initUpdater } = require('./updater');
-const APP_ICON_PATH = path.join(__dirname, 'assets', 'iconocalculadora.ico');
+const APP_ICON_PATH = path.join(__dirname, 'assets', 'logo-insulina1.png');
 const APP_USER_MODEL_ID = 'com.ariel.calculadorafarmacia';
 
 let closeBlockedByMandatoryUpdate = false;
@@ -77,6 +78,41 @@ ipcMain.handle('window-is-maximized', () => {
 });
 
 ipcMain.handle('get-app-version', () => app.getVersion());
+ipcMain.handle('patients-read', async () => {
+  const baseDir = app.getPath('userData');
+  const primaryPath = path.join(baseDir, 'pacientes.json');
+  const backupPath = path.join(baseDir, 'pacientes.backup.json');
+
+  const readPatientsFile = async (filePath) => {
+    const raw = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  };
+
+  try {
+    return await readPatientsFile(primaryPath);
+  } catch {
+    try {
+      return await readPatientsFile(backupPath);
+    } catch {
+      return [];
+    }
+  }
+});
+
+ipcMain.handle('patients-write', async (_event, payload) => {
+  const baseDir = app.getPath('userData');
+  const primaryPath = path.join(baseDir, 'pacientes.json');
+  const backupPath = path.join(baseDir, 'pacientes.backup.json');
+  const tmpPath = `${primaryPath}.tmp`;
+  const data = JSON.stringify(Array.isArray(payload) ? payload : [], null, 2);
+
+  await fs.mkdir(baseDir, { recursive: true });
+  await fs.writeFile(tmpPath, data, 'utf8');
+  await fs.rename(tmpPath, primaryPath);
+  await fs.writeFile(backupPath, data, 'utf8');
+  return true;
+});
 
 ipcMain.on('set-close-blocked-by-update', (_event, blocked) => {
   closeBlockedByMandatoryUpdate = Boolean(blocked);

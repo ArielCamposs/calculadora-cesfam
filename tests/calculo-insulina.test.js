@@ -86,14 +86,28 @@ ejecutarCaso(
 );
 
 ejecutarCaso(
-  'Caso 5: dosis baja, frasco dura mas de 42 dias => advertencia',
+  'Caso 5: dosis baja, frasco dura mas de 42 dias pero cobertura minima de 30 dias => 1 frasco',
   {
     ...base,
     administraciones: [{ nombre: 'AM', dosisUI: 5 }]
   },
   (output) => {
     assert.equal(output.diasQueRindeUnFrasco > 42, true);
-    assert.equal(output.advertencias.length > 0, true);
+    assert.equal(output.cantidadFrascos, 1);
+    assert.equal(output.diasCoberturaTotal, 42);
+  }
+);
+
+ejecutarCaso(
+  'Caso 5b: dosis baja con cobertura minima de 60 dias => 2 frascos por tope de 42 dias',
+  {
+    ...base,
+    diasMinimosTratamiento: 60,
+    administraciones: [{ nombre: 'AM', dosisUI: 5 }]
+  },
+  (output) => {
+    assert.equal(output.cantidadFrascos, 2);
+    assert.equal(output.diasCoberturaTotal, 84);
   }
 );
 

@@ -29,7 +29,9 @@ const footerNote = document.getElementById('footerNote');
 const actionsRow = document.getElementById('actionsRow');
 const btnClearAll = document.getElementById('btnClearAll');
 const btnAddPatient = document.getElementById('btnAddPatient');
+const btnToggleFarMode = document.getElementById('btnToggleFarMode');
 const btnOpenUpdates = document.getElementById('btnOpenUpdates');
+const calcCard = document.querySelector('.calc-card');
 const updateNotificationDot = document.getElementById('updateNotificationDot');
 const appVersionLabel = document.getElementById('appVersionLabel');
 const updateStatusText = document.getElementById('updateStatusText');
@@ -69,6 +71,20 @@ const DIAS_MAXIMOS_FRASCO_ABIERTO = 42;
 // Cambiar aquí si el CESFAM trabaja con otra capacidad base.
 const CAPACIDAD_FRASCO_UI_POR_DEFECTO = 1000;
 const MAX_ADMINISTRACIONES = 10;
+const FERIADOS_FIJOS_CHILE_MM_DD = [
+  '05-01', // Día Nacional del Trabajo
+  '05-21', // Día de las Glorias Navales
+  '06-21', // Día Nacional de los Pueblos Indígenas
+  '06-29', // San Pedro y San Pablo
+  '07-16', // Día de la Virgen del Carmen
+  '08-15', // Asunción de la Virgen
+  '09-18', // Independencia Nacional
+  '09-19', // Glorias del Ejército
+  '10-12', // Encuentro de Dos Mundos
+  '11-01', // Día de Todos los Santos
+  '12-08', // Inmaculada Concepción
+  '12-25' // Navidad
+];
 
 /**
  * @typedef {{ id: string; nombre: string; dosisUI: number }} AdministracionUI
@@ -76,6 +92,7 @@ const MAX_ADMINISTRACIONES = 10;
 
 // --- Persistencia local ---
 const PATIENTS_STORAGE_KEY = 'cesfam_saved_patients_v1';
+const FAR_MODE_STORAGE_KEY = 'cesfam_far_mode_enabled_v1';
 const MAX_PATIENTS = 200;
 
 let patients = [];
@@ -87,6 +104,8 @@ let updateNotificationPending = false;
 let administrationIdSequence = 1;
 /** @type {AdministracionUI[]} */
 let administracionesState = [];
+let patientsPersistQueue = Promise.resolve();
+let farModeEnabled = false;
 
 function setMandatoryUpdateState(active) {
   mandatoryUpdatePending = Boolean(active);
@@ -182,6 +201,24 @@ function setActionsVisible(visible) {
   actionsRow.style.display = visible ? 'flex' : 'none';
 }
 
+function focusFirstResultCard() {
+  const firstResultCard = resultArea.querySelector('.result-card[tabindex="0"]');
+  if (firstResultCard instanceof HTMLElement) firstResultCard.focus();
+}
+
+function applyFarMode(enabled) {
+  farModeEnabled = Boolean(enabled);
+  document.body.classList.toggle('accessibility-far-mode', farModeEnabled);
+  btnToggleFarMode.classList.toggle('is-active', farModeEnabled);
+  btnToggleFarMode.setAttribute('aria-pressed', String(farModeEnabled));
+  btnToggleFarMode.textContent = farModeEnabled ? 'Modo de lejos: ON' : 'Modo de lejos: OFF';
+}
+
+function loadFarModePreference() {
+  const raw = localStorage.getItem(FAR_MODE_STORAGE_KEY);
+  applyFarMode(raw === '1');
+}
+
 function formatNumber(value, decimals = 2) {
   return Number(value).toLocaleString('es-CL', {
     minimumFractionDigits: 0,
@@ -198,13 +235,49 @@ function getDeliveryDayInfo(fechaISO) {
   const nombreDia = parsed.toLocaleDateString('es-CL', { weekday: 'long' });
   const day = parsed.getDay();
   const esHabil = day !== 0;
-  const estadoTexto = day === 6 ? 'Hábil (sábado operativo CESFAM)' : (esHabil ? 'Hábil' : 'No hábil');
+  const estadoTexto = day === 6 ? 'Hábil' : (esHabil ? 'Hábil' : 'No hábil');
   return { nombreDia, esHabil, estadoTexto };
+}
+
+function formatLongSpanishDate(fechaISO) {
+  const parsed = new Date(`${fechaISO}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return fechaISO;
+  return parsed.toLocaleDateString('es-CL', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
+function getTodayISODate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getFeriadosChileISOByYear(year) {
+  return FERIADOS_FIJOS_CHILE_MM_DD.map((mmdd) => `${year}-${mmdd}`);
+}
+
+function getFeriadosOperativosISO() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const years = [currentYear, currentYear + 1];
+  return years.flatMap((year) => getFeriadosChileISOByYear(year));
 }
 
 function getDefaultAdministrationName(position) {
   if (position === 0) return 'AM';
   if (position === 1) return 'PM';
+  return `Administración ${position + 1}`;
+}
+
+function getAdministrationVisualLabel(position) {
+  if (position === 0) return 'Administración AM';
+  if (position === 1) return 'Administración PM';
   return `Administración ${position + 1}`;
 }
 
@@ -227,7 +300,8 @@ function syncAdministrationCountInput() {
 
 function renderAdministrationsInputs() {
   administrationsList.innerHTML = administracionesState.map((admin, index) => `
-    <div class="administration-item" data-admin-id="${escapeHtml(admin.id)}">
+    <div class="administration-item administration-item-${index % 2 === 0 ? 'am' : 'pm'}" data-admin-id="${escapeHtml(admin.id)}">
+      <div class="administration-item-header">${escapeHtml(getAdministrationVisualLabel(index))}</div>
       <div class="input-row">
         <input
           type="text"
@@ -428,55 +502,56 @@ function calculate() {
   }
 
   try {
+    const fechaReferenciaISO = getTodayISODate();
+    const feriadosOperativosISO = getFeriadosOperativosISO();
     const resultado = calcularEntregaInsulinaFn({
       administraciones: form.administraciones,
       capacidadFrascoUI: form.capacidadFrascoUI,
       diasMinimosTratamiento: DIAS_MINIMOS_TRATAMIENTO,
-      diasMaximosFrascoAbierto: DIAS_MAXIMOS_FRASCO_ABIERTO
+      diasMaximosFrascoAbierto: DIAS_MAXIMOS_FRASCO_ABIERTO,
+      feriadosISO: feriadosOperativosISO
     });
 
-    const warningsHtml = resultado.advertencias.length > 0
-      ? `<div class="warning-list">
-          <p><strong>Advertencias operativas</strong></p>
-          ${resultado.advertencias.map((item) => `<p>- ${escapeHtml(item)}</p>`).join('')}
-        </div>`
-      : '';
+    const warningsHtml = '';
 
     const entregaInfo = getDeliveryDayInfo(resultado.fechaProximaEntregaHabilISO);
+    const fechaEntregaTexto = formatLongSpanishDate(resultado.fechaProximaEntregaHabilISO);
+    const fechaReferenciaTexto = formatLongSpanishDate(fechaReferenciaISO);
 
     resultArea.innerHTML = `
       <div class="result-grid">
-        <div class="result-card">
+        <div class="result-card" tabindex="0">
           <p class="result-card-title">Dosis diaria total</p>
-          <p class="result-card-value">${formatNumber(resultado.dosisDiariaTotal, 0)} UI</p>
+          <p class="result-card-value result-number-lg">${formatNumber(resultado.dosisDiariaTotal, 0)} UI</p>
         </div>
-        <div class="result-card">
+        <div class="result-card" tabindex="0">
           <p class="result-card-title">Días que rinde 1 frasco</p>
-          <p class="result-card-value">${formatNumber(resultado.diasQueRindeUnFrasco, 0)}</p>
+          <p class="result-card-value result-number-lg">${formatNumber(resultado.diasQueRindeUnFrasco, 0)}</p>
         </div>
-        <div class="result-card">
+        <div class="result-card" tabindex="0">
           <p class="result-card-title">Frascos a entregar</p>
-          <p class="result-card-value">${resultado.cantidadFrascos}</p>
+          <p class="result-card-value result-number-lg">${resultado.cantidadFrascos}</p>
           <p class="result-card-sub">Mínimo ${DIAS_MINIMOS_TRATAMIENTO} días</p>
         </div>
-        <div class="result-card">
+        <div class="result-card" tabindex="0">
           <p class="result-card-title">Cobertura total</p>
-          <p class="result-card-value">${formatNumber(resultado.diasCoberturaTotal, 0)} días</p>
+          <p class="result-card-value result-number-lg">${formatNumber(resultado.diasCoberturaTotal, 0)} días</p>
         </div>
-        <div class="result-card">
+        <div class="result-card" tabindex="0">
           <p class="result-card-title">Próxima entrega hábil</p>
-          <p class="result-card-value">${escapeHtml(resultado.fechaProximaEntregaHabilISO)}</p>
+          <p class="result-card-value">${escapeHtml(fechaEntregaTexto)}</p>
+          <p class="result-card-sub">Calculado desde: ${escapeHtml(fechaReferenciaTexto)}</p>
           <p class="result-card-sub">Día: ${escapeHtml(entregaInfo.nombreDia)} | ${escapeHtml(entregaInfo.estadoTexto)}</p>
           <p class="result-card-sub">Ajuste por no hábil: adelanto de ${formatNumber(resultado.diasNoHabilesAdicionales, 0)} días</p>
         </div>
-        <div class="result-card">
+        <div class="result-card" tabindex="0">
           <p class="result-card-title">Tipo de jeringa</p>
           <p class="result-card-value">${escapeHtml(resultado.tipoJeringa)}</p>
-          <p class="result-card-sub">Regla actual: &lt;50 UI = 50UI | &gt;100 UI = 100UI</p>
+          <p class="result-card-sub">Regla actual: &lt;50 UI = 50UI | 50 a 100 UI = 100UI (criterio operativo) | &gt;100 UI = 100UI</p>
         </div>
-        <div class="result-card">
+        <div class="result-card" tabindex="0">
           <p class="result-card-title">Jeringas a entregar</p>
-          <p class="result-card-value">${resultado.cantidadJeringas}</p>
+          <p class="result-card-value result-number-lg">${resultado.cantidadJeringas}</p>
           <p class="result-card-sub">${resultado.administracionesDiarias} administraciones/día</p>
         </div>
       </div>
@@ -490,18 +565,38 @@ function calculate() {
 }
 
 // --- Pacientes guardados (panel derecho) ---
-function loadPatientsFromStorage() {
+async function loadPatientsFromStorage() {
   try {
+    const filePatients = await ipcRenderer.invoke('patients-read');
+    if (Array.isArray(filePatients) && filePatients.length > 0) {
+      patients = filePatients.slice(0, MAX_PATIENTS);
+      return;
+    }
+
     const raw = localStorage.getItem(PATIENTS_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     patients = Array.isArray(parsed) ? parsed.slice(0, MAX_PATIENTS) : [];
+
+    // Migra de localStorage a archivo en primer inicio con datos existentes.
+    if (patients.length > 0) {
+      await ipcRenderer.invoke('patients-write', patients);
+    }
   } catch {
     patients = [];
   }
 }
 
 function persistPatients() {
-  localStorage.setItem(PATIENTS_STORAGE_KEY, JSON.stringify(patients.slice(0, MAX_PATIENTS)));
+  const snapshot = patients.slice(0, MAX_PATIENTS);
+  localStorage.setItem(PATIENTS_STORAGE_KEY, JSON.stringify(snapshot));
+
+  patientsPersistQueue = patientsPersistQueue
+    .then(() => ipcRenderer.invoke('patients-write', snapshot))
+    .catch((error) => {
+      console.error('[patients] No se pudo guardar pacientes.json/backup:', error);
+    });
+
+  return patientsPersistQueue;
 }
 
 function renderPatientsList() {
@@ -743,6 +838,17 @@ administrationsList.addEventListener('input', (event) => {
   calculate();
 });
 
+if (calcCard instanceof HTMLElement) {
+  calcCard.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    if (!(event.target instanceof HTMLInputElement)) return;
+    if (event.target.type === 'button') return;
+    event.preventDefault();
+    calculate();
+    focusFirstResultCard();
+  });
+}
+
 btnAddAdministration.addEventListener('click', () => {
   if (administracionesState.length >= MAX_ADMINISTRACIONES) return;
   createAdministration();
@@ -759,6 +865,11 @@ btnRemoveAdministration.addEventListener('click', () => {
 
 btnClearAll.addEventListener('click', clearAllFields);
 btnAddPatient.addEventListener('click', openPatientModal);
+btnToggleFarMode.addEventListener('click', () => {
+  const nextEnabled = !farModeEnabled;
+  applyFarMode(nextEnabled);
+  localStorage.setItem(FAR_MODE_STORAGE_KEY, nextEnabled ? '1' : '0');
+});
 btnCancelPatient.addEventListener('click', closePatientModal);
 btnSavePatient.addEventListener('click', savePatientFromModal);
 btnOpenUpdates.addEventListener('click', openUpdatePanel);
@@ -1026,9 +1137,14 @@ createAdministration('AM', 0);
 createAdministration('PM', 0);
 renderAdministrationsInputs();
 
-loadPatientsFromStorage();
-renderPatientsList();
-calculate();
-setUpdateReleaseNotes('');
-loadAppVersionLabel();
-syncMaximizeButtonState();
+async function initializeApp() {
+  loadFarModePreference();
+  await loadPatientsFromStorage();
+  renderPatientsList();
+  calculate();
+  setUpdateReleaseNotes('');
+  loadAppVersionLabel();
+  syncMaximizeButtonState();
+}
+
+initializeApp();

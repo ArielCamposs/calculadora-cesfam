@@ -50,12 +50,13 @@ function calcularEntregaInsulina(input) {
   const existeDosisEntre50y100 = input.administraciones.some((admin) => admin.dosisUI >= 50 && admin.dosisUI <= 100);
   const tipoJeringa = existeDosisMayorA100 ? '100UI' : (todasDosisMenoresA50 ? '50UI' : '100UI');
   const diasQueRindeUnFrascoReal = input.capacidadFrascoUI / dosisDiariaTotal;
-  const frascosPorCobertura = Math.ceil((input.diasMinimosTratamiento * dosisDiariaTotal) / input.capacidadFrascoUI);
+  const diasEfectivosPorFrasco = Math.min(diasQueRindeUnFrascoReal, input.diasMaximosFrascoAbierto);
+  const frascosPorCobertura = Math.ceil(input.diasMinimosTratamiento / diasEfectivosPorFrasco);
   const cantidadFrascos = Math.max(1, frascosPorCobertura);
   const fechaInicio = parseDateOnly(input.fechaReferenciaISO || getTodayISODate());
   const feriadosSet = new Set((input.feriadosISO || []).map(normalizeIsoDate));
 
-  const diasCoberturaTotalReal = (cantidadFrascos * input.capacidadFrascoUI) / dosisDiariaTotal;
+  const diasCoberturaTotalReal = cantidadFrascos * diasEfectivosPorFrasco;
   const diasCoberturaTotal = Math.floor(diasCoberturaTotalReal);
   const fechaTerminoTeorica = addDays(fechaInicio, diasCoberturaTotal);
   const fechaProximaEntregaHabil = moveToPreviousBusinessDay(fechaTerminoTeorica, feriadosSet);
@@ -68,16 +69,6 @@ function calcularEntregaInsulina(input) {
   const advertencias = [];
   /** @type {string[]} */
   const detalleCalculo = [];
-
-  if (diasQueRindeUnFrascoReal > input.diasMaximosFrascoAbierto) {
-    advertencias.push(
-      `Regla ambigua: un frasco rendiría ${formatNumber(diasQueRindeUnFrascoReal)} días, superando el máximo operativo de ${input.diasMaximosFrascoAbierto} días abierto.`
-    );
-    advertencias.push(
-      'Se mantuvo el cálculo mínimo por cobertura para no inventar reglas clínicas. Revisar criterio local de fraccionamiento/dispensación.'
-    );
-    // TODO_NEGOCIO: Definir con CESFAM el criterio oficial cuando 1 frasco supera vigencia de 42 días abiertos.
-  }
 
   if (existeDosisEntre50y100 && !existeDosisMayorA100) {
     advertencias.push(
@@ -95,10 +86,10 @@ function calcularEntregaInsulina(input) {
   detalleCalculo.push(`Dosis diaria total: ${dosisDiariaTotal} UI (${administracionesDiarias} administraciones/día).`);
   detalleCalculo.push(`Días que rinde 1 frasco: ${formatNumber(input.capacidadFrascoUI)} / ${dosisDiariaTotal} = ${formatNumber(diasQueRindeUnFrascoReal)} días (${diasQueRindeUnFrasco} días enteros).`);
   detalleCalculo.push(
-    `Frascos mínimos por cobertura: ceil((${input.diasMinimosTratamiento} x ${dosisDiariaTotal}) / ${formatNumber(input.capacidadFrascoUI)}) = ${cantidadFrascos}.`
+    `Frascos mínimos por cobertura: ceil(${input.diasMinimosTratamiento} / min(${formatNumber(diasQueRindeUnFrascoReal)}, ${input.diasMaximosFrascoAbierto})) = ${cantidadFrascos}.`
   );
   detalleCalculo.push(
-    `Cobertura total real: (${cantidadFrascos} x ${formatNumber(input.capacidadFrascoUI)}) / ${dosisDiariaTotal} = ${formatNumber(diasCoberturaTotalReal)} días (${diasCoberturaTotal} días enteros).`
+    `Cobertura total real: ${cantidadFrascos} x ${formatNumber(diasEfectivosPorFrasco)} = ${formatNumber(diasCoberturaTotalReal)} días (${diasCoberturaTotal} días enteros).`
   );
   detalleCalculo.push(
     `Fecha de reposición teórica: ${toISODate(fechaTerminoTeorica)}. Fecha de entrega hábil: ${toISODate(fechaProximaEntregaHabil)} (lunes a sábado, excluyendo domingos y feriados).`

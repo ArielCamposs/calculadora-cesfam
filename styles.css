@@ -124,8 +124,6 @@ body {
   height: 100%;
   display: block;
   object-fit: contain;
-  transform: scale(3.2);
-  transform-origin: center;
 }
 
 .header-title {
@@ -199,16 +197,18 @@ body {
 .input-row {
   display: flex;
   align-items: center;
-  background: #F5F7FC;
-  border: 1.5px solid #e5e9f2;
+  background: #ffffff;
+  border: 1.5px solid #cfd8ea;
   border-radius: 10px;
   padding: 0 14px;
-  transition: border-color 0.2s;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
 }
 
 .input-row:focus-within {
-  border-color: #6b9bf2;
-  background: #fff;
+  border-color: #4f7fd9;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(79, 127, 217, 0.18);
 }
 
 .input-field {
@@ -226,7 +226,7 @@ body {
 }
 
 .input-field::placeholder {
-  color: #c5cce0;
+  color: #93a1ba;
   font-weight: 400;
 }
 
@@ -293,6 +293,29 @@ body {
   display: grid;
   grid-template-columns: 1fr 1.4fr;
   gap: 8px;
+  border: 1px solid #dbe7ff;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fbff;
+}
+
+.administration-item-header {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  color: #355fa8;
+}
+
+.administration-item-am {
+  border-left: 4px solid #3b82f6;
+  background: #f5f9ff;
+}
+
+.administration-item-pm {
+  border-left: 4px solid #8b5cf6;
+  background: #faf5ff;
 }
 
 .actions-row-small {
@@ -342,6 +365,11 @@ body {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px;
+}
+
+.result-card:focus-visible {
+  outline: 3px solid #7da2ee;
+  outline-offset: 1px;
 }
 
 .result-card-title {
@@ -581,6 +609,46 @@ body {
 .btn-clear-all:hover {
   background: #ffe4e4;
   border-color: #eba8a8;
+}
+
+.btn-accessibility-toggle {
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-accessibility-toggle:hover {
+  background: #e0e7ff;
+  border-color: #a5b4fc;
+}
+
+.btn-accessibility-toggle.is-active {
+  background: #dbeafe;
+  border-color: #60a5fa;
+  color: #1d4ed8;
+}
+
+body.accessibility-far-mode .result-number-lg {
+  font-size: 32px;
+  line-height: 1.05;
+}
+
+body.accessibility-far-mode .result-card-title {
+  font-size: 12px;
+}
+
+body.accessibility-far-mode .result-card-sub {
+  font-size: 12px;
+}
+
+body.accessibility-far-mode .daily-total-box {
+  font-size: 16px;
 }
 
 .result-main {
@@ -1021,7 +1089,6 @@ body {
   .header-icon-svg {
     width: 100%;
     height: 100%;
-    transform: scale(3);
   }
 
   .header-title {

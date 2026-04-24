@@ -6,7 +6,7 @@ const pngToIco = pngToIcoModule.default || pngToIcoModule;
 
 async function generar() {
   const root = path.resolve(__dirname, '..');
-  const sourcePng = path.join(root, 'assets', 'iconocalculadora.png');
+  const sourcePng = path.join(root, 'assets', 'logo-insulina1.png');
   const iconIco = path.join(root, 'assets', 'iconocalculadora.ico');
   const tmpDir = path.join(root, 'assets', '.tmp-icon');
 

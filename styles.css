@@ -539,40 +539,43 @@ body {
 
 .btn-update-check,
 .btn-update-install {
-  border-radius: 8px;
-  padding: 6px 10px;
+  border-radius: 10px;
+  padding: 7px 12px;
   font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.15px;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-update-check {
-  border: 1px solid #b8cef8;
-  background: #eef4ff;
-  color: #2f5fb8;
+  border: 1px solid #6f96df;
+  background: #7ea6ee;
+  color: #ffffff;
 }
 
 .btn-update-install {
-  border: 1px solid #f59e0b;
-  background: #fbbf24;
-  color: #78350f;
+  border: 1px solid #d08a06;
+  background: #e8a620;
+  color: #ffffff;
 }
 
 .btn-add-patient {
-  border: 1px solid #b8cef8;
-  background: #eef4ff;
-  color: #2f5fb8;
-  border-radius: 10px;
-  padding: 8px 16px;
+  border: 1px solid #4f7fd9;
+  background: #5d8eea;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 9px 16px;
   font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.2px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-add-patient:hover {
-  background: #e1ecff;
-  border-color: #9dbbf4;
+  background: #517fda;
+  border-color: #456fc3;
 }
 
 .btn-add-patient:disabled,
@@ -595,43 +598,71 @@ body {
 }
 
 .btn-clear-all {
-  border: 1px solid #f3c2c2;
-  background: #fff5f5;
-  color: #b42318;
-  border-radius: 10px;
-  padding: 8px 16px;
+  border: 1px solid #cc5a5a;
+  background: #de5d5d;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 9px 16px;
   font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.2px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-clear-all:hover {
-  background: #ffe4e4;
-  border-color: #eba8a8;
+  background: #d45353;
+  border-color: #c04c4c;
 }
 
 .btn-accessibility-toggle {
-  border: 1px solid #c7d2fe;
-  background: #eef2ff;
-  color: #3730a3;
-  border-radius: 10px;
-  padding: 8px 12px;
+  border: 1px solid #637bdd;
+  background: #6f88eb;
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 9px 12px;
   font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.2px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-accessibility-toggle:hover {
-  background: #e0e7ff;
-  border-color: #a5b4fc;
+  background: #617ce2;
+  border-color: #556fd4;
 }
 
 .btn-accessibility-toggle.is-active {
-  background: #dbeafe;
-  border-color: #60a5fa;
-  color: #1d4ed8;
+  background: #3f6fca;
+  border-color: #345fb1;
+  color: #ffffff;
+}
+
+.btn-add-patient:active,
+.btn-clear-all:active,
+.btn-accessibility-toggle:active,
+.btn-update-check:active,
+.btn-update-install:active,
+.btn-modal-secondary:active,
+.btn-modal-primary:active,
+.btn-modal-danger:active {
+  filter: brightness(0.96);
+}
+
+.btn-add-patient:focus-visible,
+.btn-clear-all:focus-visible,
+.btn-accessibility-toggle:focus-visible,
+.btn-update-check:focus-visible,
+.btn-update-install:focus-visible,
+.btn-modal-secondary:focus-visible,
+.btn-modal-primary:focus-visible,
+.btn-modal-danger:focus-visible,
+.tb-btn:focus-visible,
+.patient-delete:focus-visible,
+.patient-load:focus-visible {
+  outline: 3px solid rgba(79, 127, 217, 0.32);
+  outline-offset: 1px;
 }
 
 body.accessibility-far-mode .result-number-lg {
@@ -993,17 +1024,24 @@ body.accessibility-far-mode .daily-total-box {
 
 .btn-modal-secondary,
 .btn-modal-primary {
-  border-radius: 10px;
-  padding: 8px 12px;
+  border-radius: 12px;
+  padding: 9px 12px;
   font-size: 12px;
   font-weight: 700;
+  letter-spacing: 0.2px;
   cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .btn-modal-secondary {
-  border: 1px solid #d0d5dd;
-  background: #fff;
-  color: #475467;
+  border: 1px solid #9ca3af;
+  background: #6b7280;
+  color: #ffffff;
+}
+
+.btn-modal-secondary:hover {
+  background: #5f6674;
+  border-color: #8b93a1;
 }
 
 .btn-modal-primary {

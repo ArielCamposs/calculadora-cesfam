@@ -118,11 +118,15 @@ function setUpdateNotification(visible) {
 }
 
 function sanitizeIntInput(input, minValue) {
-  if (input.value === '') return;
+  const digits = sanitizeDigitsOnly(input.value);
+  if (digits === '') {
+    input.value = '';
+    return;
+  }
 
-  const n = Math.trunc(Number(input.value));
+  const n = parseInt(digits, 10);
   if (!Number.isFinite(n)) {
-    input.value = String(minValue ?? 0);
+    input.value = '';
     return;
   }
 
@@ -134,6 +138,20 @@ function sanitizeIntInput(input, minValue) {
   const max = maxByInputId[input.id] ?? 999;
   const clamped = n < min ? min : n > max ? max : n;
   input.value = String(clamped);
+}
+
+function isPositiveIntRestrictedField(el) {
+  if (!(el instanceof HTMLInputElement)) return false;
+  if (el === vialCapacityUIInput || el === administrationCountInput) return true;
+  return el.classList.contains('administration-dose');
+}
+
+/** Bloquea letras, signos, e, punto, etc.; solo dígitos (pegar se normaliza en `sanitizeIntInput`). */
+function shouldBlockKeyInPositiveIntField(event) {
+  if (event.ctrlKey || event.metaKey || event.altKey) return false;
+  const k = event.key;
+  if (k.length !== 1) return false;
+  return !/[0-9]/.test(k);
 }
 
 function normalizeRut(rut) {
@@ -313,12 +331,11 @@ function renderAdministrationsInputs() {
       </div>
       <div class="input-row">
         <input
-          type="number"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
           class="input-field administration-dose"
           value="${admin.dosisUI > 0 ? String(admin.dosisUI) : ''}"
-          min="0"
-          max="999"
-          step="1"
           placeholder="0"
         />
         <span class="input-unit">UI</span>
@@ -541,7 +558,7 @@ function calculate() {
           <p class="result-card-title">Próxima entrega hábil</p>
           <p class="result-card-value">${escapeHtml(fechaEntregaTexto)}</p>
           <p class="result-card-sub">Calculado desde: ${escapeHtml(fechaReferenciaTexto)}</p>
-          <p class="result-card-sub">Día: ${escapeHtml(entregaInfo.nombreDia)} | ${escapeHtml(entregaInfo.estadoTexto)}</p>
+          <p class="result-card-sub">Día de prox. entrega: ${escapeHtml(entregaInfo.nombreDia)} | ${escapeHtml(entregaInfo.estadoTexto)}</p>
           <p class="result-card-sub">Ajuste por no hábil: adelanto de ${formatNumber(resultado.diasNoHabilesAdicionales, 0)} días</p>
         </div>
         <div class="result-card" tabindex="0">
@@ -840,6 +857,10 @@ administrationsList.addEventListener('input', (event) => {
 
 if (calcCard instanceof HTMLElement) {
   calcCard.addEventListener('keydown', (event) => {
+    if (isPositiveIntRestrictedField(event.target) && shouldBlockKeyInPositiveIntField(event)) {
+      event.preventDefault();
+      return;
+    }
     if (event.key !== 'Enter') return;
     if (!(event.target instanceof HTMLInputElement)) return;
     if (event.target.type === 'button') return;

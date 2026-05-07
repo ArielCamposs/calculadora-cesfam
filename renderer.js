@@ -19,6 +19,8 @@ btnMaximize.addEventListener('click', () => {
 // --- Elementos del DOM ---
 const vialCapacityUIInput = document.getElementById('vialCapacityUI');
 const administrationCountInput = document.getElementById('administrationCount');
+const btnAdminCountDec = document.getElementById('btnAdminCountDec');
+const btnAdminCountInc = document.getElementById('btnAdminCountInc');
 const administrationsList = document.getElementById('administrationsList');
 const dailyTotalBox = document.getElementById('dailyTotalBox');
 const btnAddAdministration = document.getElementById('btnAddAdministration');
@@ -138,6 +140,13 @@ function sanitizeIntInput(input, minValue) {
   const max = maxByInputId[input.id] ?? 999;
   const clamped = n < min ? min : n > max ? max : n;
   input.value = String(clamped);
+}
+
+function sanitizeAdministrationCountTyping(input) {
+  let digits = sanitizeDigitsOnly(input.value);
+  const maxLen = String(MAX_ADMINISTRACIONES).length;
+  if (digits.length > maxLen) digits = digits.slice(0, maxLen);
+  input.value = digits;
 }
 
 function isPositiveIntRestrictedField(el) {
@@ -314,6 +323,8 @@ function createAdministration(initialName = '', initialDose = 0) {
 function syncAdministrationCountInput() {
   administrationCountInput.value = String(administracionesState.length);
   btnRemoveAdministration.disabled = administracionesState.length <= 1;
+  btnAdminCountDec.disabled = administracionesState.length <= 1;
+  btnAdminCountInc.disabled = administracionesState.length >= MAX_ADMINISTRACIONES;
 }
 
 function renderAdministrationsInputs() {
@@ -334,6 +345,7 @@ function renderAdministrationsInputs() {
           type="text"
           inputmode="numeric"
           autocomplete="off"
+          maxlength="3"
           class="input-field administration-dose"
           value="${admin.dosisUI > 0 ? String(admin.dosisUI) : ''}"
           placeholder="0"
@@ -351,6 +363,20 @@ function setAdministrationCount(nextCount) {
   while (administracionesState.length < safeCount) createAdministration();
   while (administracionesState.length > safeCount) administracionesState.pop();
   renderAdministrationsInputs();
+}
+
+function commitAdministrationCountFromInput() {
+  const s = sanitizeDigitsOnly(administrationCountInput.value);
+  if (s === '') {
+    syncAdministrationCountInput();
+    return;
+  }
+  const n = parseInt(s, 10);
+  if (!Number.isFinite(n)) {
+    syncAdministrationCountInput();
+    return;
+  }
+  setAdministrationCount(n);
 }
 
 function getAdministracionesFromUI() {
@@ -542,10 +568,6 @@ function calculate() {
           <p class="result-card-value result-number-lg">${formatNumber(resultado.dosisDiariaTotal, 0)} UI</p>
         </div>
         <div class="result-card" tabindex="0">
-          <p class="result-card-title">Días que rinde 1 frasco</p>
-          <p class="result-card-value result-number-lg">${formatNumber(resultado.diasQueRindeUnFrasco, 0)}</p>
-        </div>
-        <div class="result-card" tabindex="0">
           <p class="result-card-title">Frascos a entregar</p>
           <p class="result-card-value result-number-lg">${resultado.cantidadFrascos}</p>
           <p class="result-card-sub">Mínimo ${DIAS_MINIMOS_TRATAMIENTO} días</p>
@@ -686,7 +708,6 @@ function loadPatient(id) {
   });
   if (administracionesState.length === 0) {
     createAdministration('AM', 0);
-    createAdministration('PM', 0);
   }
 
   vialCapacityUIInput.value = patient.capacidadFrascoUI ? String(patient.capacidadFrascoUI) : '';
@@ -821,7 +842,6 @@ function clearAllFields() {
   administracionesState = [];
   administrationIdSequence = 1;
   createAdministration('AM', 0);
-  createAdministration('PM', 0);
   renderAdministrationsInputs();
 
   selectedPatientId = '';
@@ -831,17 +851,41 @@ function clearAllFields() {
 }
 
 // --- Eventos ---
-[vialCapacityUIInput, administrationCountInput].forEach((input) => {
-  input.addEventListener('input', () => {
-    if (input === vialCapacityUIInput) sanitizeIntInput(input, 1);
-    else if (input === administrationCountInput) sanitizeIntInput(input, 1);
+vialCapacityUIInput.addEventListener('input', () => {
+  sanitizeIntInput(vialCapacityUIInput, 1);
+  calculate();
+});
 
-    if (input === administrationCountInput) {
-      setAdministrationCount(parseInt(administrationCountInput.value, 10) || 1);
-    }
+administrationCountInput.addEventListener('input', () => {
+  sanitizeAdministrationCountTyping(administrationCountInput);
+  calculate();
+});
 
-    calculate();
+administrationCountInput.addEventListener('blur', () => {
+  commitAdministrationCountFromInput();
+  calculate();
+});
+
+administrationCountInput.addEventListener('focus', () => {
+  requestAnimationFrame(() => {
+    if (document.activeElement === administrationCountInput) administrationCountInput.select();
   });
+});
+
+administrationCountInput.addEventListener('mouseup', (event) => {
+  if (document.activeElement === administrationCountInput) event.preventDefault();
+});
+
+btnAdminCountDec.addEventListener('click', () => {
+  commitAdministrationCountFromInput();
+  setAdministrationCount(administracionesState.length - 1);
+  calculate();
+});
+
+btnAdminCountInc.addEventListener('click', () => {
+  commitAdministrationCountFromInput();
+  setAdministrationCount(administracionesState.length + 1);
+  calculate();
 });
 
 administrationsList.addEventListener('input', (event) => {
@@ -855,6 +899,24 @@ administrationsList.addEventListener('input', (event) => {
   calculate();
 });
 
+/** Al enfocar la dosis, selecciona todo el valor para poder reemplazarlo al teclear (evita quedar en 12 al pasar de 1 a 2, etc.). */
+administrationsList.addEventListener('focusin', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  if (!target.classList.contains('administration-dose')) return;
+  requestAnimationFrame(() => {
+    if (document.activeElement === target) target.select();
+  });
+});
+
+administrationsList.addEventListener('mouseup', (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  if (!target.classList.contains('administration-dose')) return;
+  if (document.activeElement !== target) return;
+  event.preventDefault();
+});
+
 if (calcCard instanceof HTMLElement) {
   calcCard.addEventListener('keydown', (event) => {
     if (isPositiveIntRestrictedField(event.target) && shouldBlockKeyInPositiveIntField(event)) {
@@ -865,6 +927,7 @@ if (calcCard instanceof HTMLElement) {
     if (!(event.target instanceof HTMLInputElement)) return;
     if (event.target.type === 'button') return;
     event.preventDefault();
+    if (event.target === administrationCountInput) commitAdministrationCountFromInput();
     calculate();
     focusFirstResultCard();
   });
@@ -1155,7 +1218,6 @@ if (!vialCapacityUIInput.value) {
   vialCapacityUIInput.value = String(CAPACIDAD_FRASCO_UI_POR_DEFECTO);
 }
 createAdministration('AM', 0);
-createAdministration('PM', 0);
 renderAdministrationsInputs();
 
 async function initializeApp() {

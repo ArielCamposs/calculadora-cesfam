@@ -64,20 +64,36 @@
         <div class="divider"></div>
 
         <!-- Administraciones -->
-        <div class="field-group">
+        <div class="field-group field-group--admin-count">
           <label class="field-label">
             <span class="label-icon">🕒</span>
             ADMINISTRACIONES DIARIAS
           </label>
-          <div class="input-row">
+          <div class="input-row input-row-stepper" role="group" aria-label="Cantidad de administraciones diarias">
+            <button
+              type="button"
+              class="btn-stepper"
+              id="btnAdminCountDec"
+              aria-label="Disminuir administraciones diarias"
+              title="Menos"
+            >−</button>
             <input
               type="text"
               inputmode="numeric"
               autocomplete="off"
               id="administrationCount"
-              class="input-field"
-              placeholder="2"
+              class="input-field input-field--stepper-value"
+              placeholder="1"
+              maxlength="2"
+              aria-label="Número de administraciones al día"
             />
+            <button
+              type="button"
+              class="btn-stepper"
+              id="btnAdminCountInc"
+              aria-label="Aumentar administraciones diarias"
+              title="Más"
+            >+</button>
             <span class="input-unit">al día</span>
           </div>
         </div>
